@@ -48,7 +48,6 @@ pip install numpy matplotlib scipy
 
 - The notebook uses SciPy's ShortTimeFFT for spectrogram computation, ensuring compatibility with modern SciPy versions.
 - Time arrays are adjusted to match legacy STFT behavior for consistency.
-- Phase calculations follow PDV homodyne system principles.
 
 ## Troubleshooting
 
