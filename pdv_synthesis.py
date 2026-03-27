@@ -185,6 +185,7 @@ def velocity_to_pdv_voltage(
     lambda_tar=1550.016e-9,
     power_ref_dbm=0,
     power_signal_dbm=-1,
+    power_tar_dbm=None,
     noise_sd=0.1,
     output_csv=None,
 ):
@@ -207,7 +208,10 @@ def velocity_to_pdv_voltage(
     power_ref_dbm : float
         Reference beam power in dBm (default 0 dBm).
     power_signal_dbm : float
-        Return signal power in dBm (default −1 dBm).
+        Return signal (Doppler-shifted) power in dBm (default −1 dBm).
+    power_tar_dbm : float or None
+        Constant back-reflection (target output) power in dBm.
+        Defaults to ``power_signal_dbm - 10`` if not provided.
     noise_sd : float
         Standard deviation of multiplicative Gaussian noise (default 0.1).
     output_csv : str or None
@@ -223,7 +227,8 @@ def velocity_to_pdv_voltage(
     f_tar = C_LIGHT / lambda_tar
     f_ref = C_LIGHT / lambda_ref
 
-    power_tar_dbm = power_signal_dbm - 10  # back-reflected (constant) target field
+    if power_tar_dbm is None:
+        power_tar_dbm = power_signal_dbm - 10
     E_ref0 = 10 ** (power_ref_dbm / 20)
     E_tar0 = 10 ** (power_tar_dbm / 20)
     E_s0   = 10 ** (power_signal_dbm / 20)
@@ -253,16 +258,17 @@ def velocity_to_multipoint_pdv_voltage(
     velocity,
     num_points=2,
     ref_lambdas_nm=None,
-    beat_freqs_ghz=None,
+    tar_lambdas_nm=None,
     power_ref_dbm=8,
     power_signal_dbm=-10,
+    power_tar_dbm=None,
     noise_sd=0.1,
     output_csv=None,
 ):
     """Convert a velocity-time history to a synthetic multi-point PDV voltage signal.
 
     Combines contributions from ``num_points`` independent PDV channels, each
-    at a different wavelength, into a single composite voltage waveform.
+    at a different wavelength pair, into a single composite voltage waveform.
 
     Parameters
     ----------
@@ -275,13 +281,17 @@ def velocity_to_multipoint_pdv_voltage(
     ref_lambdas_nm : array-like of float or None
         Reference wavelengths in **nm** for each channel.
         Default: ``[1531.116, 1537.397, 1543.730]``.
-    beat_freqs_ghz : array-like of float or None
-        Heterodyne beat frequencies in **GHz** for each channel.
-        Default: ``[3, 7, 10]``.
+    tar_lambdas_nm : array-like of float or None
+        Target (local oscillator) wavelengths in **nm** for each channel.
+        Default: ``[1531.102, 1537.374, 1543.703]`` (3, 7, and 10 GHz below
+        the respective reference frequencies).
     power_ref_dbm : float
         Reference power in dBm (default 8 dBm).
     power_signal_dbm : float
-        Return signal power in dBm (default −10 dBm).
+        Return signal (Doppler-shifted) power in dBm (default −10 dBm).
+    power_tar_dbm : float or None
+        Constant back-reflection (target output) power in dBm.
+        Defaults to ``power_signal_dbm - 1`` if not provided.
     noise_sd : float
         Standard deviation of multiplicative Gaussian noise (default 0.1).
     output_csv : str or None
@@ -294,16 +304,21 @@ def velocity_to_multipoint_pdv_voltage(
     """
     if ref_lambdas_nm is None:
         ref_lambdas_nm = [1531.116, 1537.397, 1543.730]
-    if beat_freqs_ghz is None:
-        beat_freqs_ghz = [3, 7, 10]
-
-    sample_rate = 1.0 / (time[1] - time[0])
 
     ref_lambdas = np.array(ref_lambdas_nm) * 1e-9
     ref_freqs   = C_LIGHT / ref_lambdas
-    tar_freqs   = ref_freqs - np.array(beat_freqs_ghz) * 1e9
 
-    power_tar_dbm = power_signal_dbm - 1
+    if tar_lambdas_nm is not None:
+        tar_lambdas = np.array(tar_lambdas_nm) * 1e-9
+        tar_freqs   = C_LIGHT / tar_lambdas
+    else:
+        # Default: 3, 7, 10 GHz below each reference frequency
+        tar_freqs = ref_freqs - np.array([3, 7, 10]) * 1e9
+
+    sample_rate = 1.0 / (time[1] - time[0])
+
+    if power_tar_dbm is None:
+        power_tar_dbm = power_signal_dbm - 1
     E_ref0 = 10 ** (power_ref_dbm / 20)
     E_tar0 = 10 ** (power_tar_dbm / 20)
     E_s0   = 10 ** (power_signal_dbm / 20)

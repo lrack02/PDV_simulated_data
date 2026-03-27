@@ -23,7 +23,7 @@ from pdv_synthesis import (
 # ---------------------------------------------------------------------------
 SHOT_TYPE   = "HEL"       # "velocity" | "HEL" | "HEL-spall"
 SAMPLE_RATE = 128e9        # Hz
-NOISE_SD    = 0.1
+NOISE_SD    = 0.01
 
 OUTPUT_DIR       = "output"
 SINGLE_POINT_CSV = os.path.join(OUTPUT_DIR, "waveform.csv")
@@ -39,6 +39,7 @@ time, velocity = generate_velocity_profile(SHOT_TYPE, sample_rate=SAMPLE_RATE)
 voltage = velocity_to_pdv_voltage(
     time,
     velocity,
+    power_tar_dbm=-15,
     noise_sd=NOISE_SD,
     output_csv=SINGLE_POINT_CSV,
 )

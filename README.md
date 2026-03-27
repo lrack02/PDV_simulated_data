@@ -68,7 +68,8 @@ Converts a velocity-time history to a **single-point** heterodyne PDV beat signa
 | `lambda_ref` | 1550 nm | Reference laser wavelength |
 | `lambda_tar` | 1550.016 nm | Target laser wavelength |
 | `power_ref_dbm` | 0 dBm | Reference beam power |
-| `power_signal_dbm` | −1 dBm | Return signal power |
+| `power_signal_dbm` | −1 dBm | Doppler-shifted return signal power |
+| `power_tar_dbm` | `power_signal_dbm - 10` | Constant back-reflection (target output) power |
 | `noise_sd` | 0.1 | Multiplicative Gaussian noise std dev |
 | `output_csv` | `None` | Path to save CSV (skipped if `None`) |
 
@@ -81,7 +82,11 @@ Same as above but synthesizes `num_points` independent PDV channels and sums the
 |-----------|---------|-------------|
 | `num_points` | 2 | Number of PDV channels |
 | `ref_lambdas_nm` | `[1531.116, 1537.397, 1543.730]` | Per-channel reference wavelengths (nm) |
-| `beat_freqs_ghz` | `[3, 7, 10]` | Per-channel heterodyne beat frequencies (GHz) |
+| `tar_lambdas_nm` | `None` | Per-channel target wavelengths (nm); defaults to 3, 7, 10 GHz below each reference |
+| `power_ref_dbm` | 8 dBm | Reference beam power |
+| `power_signal_dbm` | −10 dBm | Doppler-shifted return signal power |
+| `power_tar_dbm` | `power_signal_dbm - 1` | Constant back-reflection (target output) power |
+| `noise_sd` | 0.1 | Multiplicative Gaussian noise std dev |
 | `output_csv` | `None` | Path to save CSV |
 
 Returns: `voltage_multi` (`np.ndarray`)
