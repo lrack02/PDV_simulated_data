@@ -1,14 +1,100 @@
-# PDV Simulated Data Generator
+# PDV Simulated Data
 
-This Jupyter notebook (`PDV_gen_run.ipynb`) generates simulated Photonic Doppler Velocimetry (PDV) data from synthetic velocity time histories. It simulates various shot types (velocity, HEL, spall, HEL-spall), computes the corresponding voltage signals, adds noise, and produces spectrograms for analysis.
+Tools for generating synthetic **Photonic Doppler Velocimetry (PDV)** signals from user-supplied velocity-time histories.
 
-## Features
+## File Overview
 
-- **Synthetic Velocity Profiles**: Defines piecewise linear velocity time histories for different experimental scenarios.
-- **PDV Signal Simulation**: Converts velocity data to phase differences and voltage signals using PDV principles.
-- **Noise Addition**: Incorporates Gaussian noise to simulate real-world measurements.
-- **Spectrogram Generation**: Computes Short-Time Fourier Transform (STFT) spectrograms for frequency analysis over time.
-- **Data Export**: Outputs voltage-time data to CSV files for further processing.
+| File | Purpose |
+|------|---------|
+| `pdv_synthesis.py` | Core library — velocity → PDV voltage conversion functions |
+| `run_pdv_synthesis.py` | Entry-point script — run synthesis from the command line |
+| `PDV_gen_run.ipynb` | Interactive notebook — exploration, visualization, and spectrograms |
+| `output/waveform.csv` | Output: single-point PDV voltage vs. time |
+| `output/waveform_multi.csv` | Output: multi-point (composite) PDV voltage vs. time |
+
+---
+
+## Quick Start
+
+### Command-line
+
+```bash
+python run_pdv_synthesis.py
+```
+
+Edit `SHOT_TYPE`, `SAMPLE_RATE`, and `NOISE_SD` at the top of that file to change parameters.  Outputs are written to `waveform.csv` and `waveform_multi.csv`.
+
+### In your own script
+
+```python
+from pdv_synthesis import generate_velocity_profile, velocity_to_pdv_voltage
+
+time, velocity = generate_velocity_profile("HEL", sample_rate=128e9)
+
+voltage = velocity_to_pdv_voltage(
+    time,
+    velocity,
+    noise_sd=0.1,
+    output_csv="waveform.csv",   # omit to skip saving
+)
+```
+
+Bring your own velocity array instead of using `generate_velocity_profile`:
+
+```python
+import numpy as np
+from pdv_synthesis import velocity_to_pdv_voltage
+
+time = np.arange(0, 1e-6, 1 / 128e9)   # 1 µs at 128 GHz
+velocity = np.linspace(0, 500, len(time))  # ramp to 500 m/s
+
+voltage = velocity_to_pdv_voltage(time, velocity, output_csv="my_waveform.csv")
+```
+
+---
+
+## `pdv_synthesis.py` API
+
+### `generate_velocity_profile(shot_type, sample_rate, **kwargs)`
+Returns `(time, velocity)` arrays for a named shot type.
+Supported `shot_type` values: `"velocity"`, `"HEL"`, `"HEL-spall"`.
+Pass keyword arguments to override any default parameter (e.g., `vel_peak=400`).
+
+### `velocity_to_pdv_voltage(time, velocity, ...)`
+Converts a velocity-time history to a **single-point** heterodyne PDV beat signal.
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `lambda_ref` | 1550 nm | Reference laser wavelength |
+| `lambda_tar` | 1550.016 nm | Target laser wavelength |
+| `power_ref_dbm` | 0 dBm | Reference beam power |
+| `power_signal_dbm` | −1 dBm | Return signal power |
+| `noise_sd` | 0.1 | Multiplicative Gaussian noise std dev |
+| `output_csv` | `None` | Path to save CSV (skipped if `None`) |
+
+Returns: `voltage` (`np.ndarray`)
+
+### `velocity_to_multipoint_pdv_voltage(time, velocity, ...)`
+Same as above but synthesizes `num_points` independent PDV channels and sums them into a single composite waveform.
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `num_points` | 2 | Number of PDV channels |
+| `ref_lambdas_nm` | `[1531.116, 1537.397, 1543.730]` | Per-channel reference wavelengths (nm) |
+| `beat_freqs_ghz` | `[3, 7, 10]` | Per-channel heterodyne beat frequencies (GHz) |
+| `output_csv` | `None` | Path to save CSV |
+
+Returns: `voltage_multi` (`np.ndarray`)
+
+### `compute_stft(voltage, fs, ...)`
+Wrapper around SciPy `ShortTimeFFT` with zero-padded boundaries and legacy-compatible time axis.
+Returns `(f, t, Zxx)`.
+
+### `load_waveform_csv(filepath)`
+Loads a previously saved CSV.
+Returns `(time, voltage)`.
+
+---
 
 ## Dependencies
 
@@ -17,43 +103,17 @@ This Jupyter notebook (`PDV_gen_run.ipynb`) generates simulated Photonic Doppler
 - Matplotlib
 - SciPy
 
-Install dependencies using pip:
-
 ```bash
 pip install numpy matplotlib scipy
 ```
 
-## Usage
-
-1. Open the notebook in Jupyter Lab or Jupyter Notebook.
-2. Modify parameters as needed (e.g., `shot_type`, `sample_rate`, `noise_sd`).
-3. Execute the cells sequentially.
-4. View generated plots and spectrograms inline.
-5. Check output CSV files: `waveform.csv` and `waveform_multi.csv`.
-
-## Parameters
-
-- `shot_type`: Choose from "velocity", "HEL", "spall", or "HEL-spall".
-- `sample_rate`: Sampling frequency (default: 128 GHz).
-- `lambda_ref` and `lambda_tar`: Reference and target wavelengths (default: 1550 nm variants).
-- `noise_sd`: Standard deviation of added Gaussian noise (default: 0.1).
-
-## Output Files
-
-- `waveform.csv`: Single-channel voltage-time data.
-- `waveform_multi.csv`: Multi-channel voltage-time data (if applicable).
-- Inline plots: Velocity profile, voltage signal, and spectrogram.
+---
 
 ## Notes
 
-- The notebook uses SciPy's ShortTimeFFT for spectrogram computation, ensuring compatibility with modern SciPy versions.
-- Time arrays are adjusted to match legacy STFT behavior for consistency.
-
-## Troubleshooting
-
-- Ensure all dependencies are installed.
-- If plots do not display, check Matplotlib backend configuration.
-- For large datasets, increase memory allocation or reduce `sample_rate`.
+- Phase calculations follow heterodyne PDV principles: the beat signal encodes the round-trip Doppler phase $\phi(t) = 4\pi L(t)/\lambda$.
+- Noise is multiplicative Gaussian, scaled to signal amplitude.
+- STFT parameters (`nperseg`, `noverlap`, `nfft`) are tunable in the notebook or via `compute_stft`.
 
 ## License
 
