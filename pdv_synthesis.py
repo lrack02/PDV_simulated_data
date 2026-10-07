@@ -241,6 +241,87 @@ def velocity_to_pdv_voltage(
     E_s   = E_s0   * np.cos(2 * np.pi * f_tar * time - phase)
 
     voltage = E_ref * E_s + E_ref * E_tar + E_tar * E_s
+    # voltage = (E_ref + E_tar + E_s)**2
+    voltage += voltage.max() * np.random.normal(0, noise_sd, voltage.size)
+
+    if output_csv is not None:
+        _save_waveform_csv(time, voltage, output_csv)
+
+    return voltage
+
+def multiple_velocity_to_pdv_voltage(
+        time, 
+        velocity_array,
+        lambda_ref=1550e-9,
+        lambda_tar=1550.016e-9,
+        power_ref_dbm=0,
+        power_signals_dbm=-1,
+        noise_sd=0.1,
+        output_csv=None,
+):
+    """Convert a velocity-time history to a synthetic single-point PDV voltage signal.
+
+    Simulates heterodyne PDV beat signal including reference, 
+    and multiple Doppler-shifted signal fields. Gaussian multiplicative
+    noise is added.
+
+    Parameters
+    ----------
+    time : np.ndarray
+        Time array in seconds.
+    velocity_array : np.ndarray
+        Velocity array in m/s, with same number of rows as ``time`` 
+        and columns as number of velocity signals.
+    lambda_ref : float
+        Reference laser wavelength in meters (default 1550 nm).
+    lambda_tar : float
+        Target laser wavelength in meters (default 1550.016 nm).
+    power_ref_dbm : float
+        Reference beam power in dBm (default 0 dBm).
+    power_signals_dbm : float
+        Return signal (Doppler-shifted) powers in dBm corresponding
+        to each velocity signal (default −1 dBm). Same length as 
+        columns of velocity_array
+    noise_sd : float
+        Standard deviation of multiplicative Gaussian noise (default 0.1).
+    output_csv : str or None
+        If given, save ``(time, voltage)`` to this CSV path.
+
+    Returns
+    -------
+    voltage : np.ndarray
+        Simulated PDV voltage array, same length as ``time``.
+    """
+    sample_rate = 1.0 / (time[1] - time[0])
+
+    f_tar = C_LIGHT / lambda_tar
+    f_ref = C_LIGHT / lambda_ref
+
+    velocity_array = np.asarray(velocity_array, dtype=float)
+    if velocity_array.ndim == 1:
+        velocity_array = velocity_array[:, None]
+
+    power_signals_dbm = np.atleast_1d(np.asarray(power_signals_dbm, dtype=float))
+    n_signals = velocity_array.shape[1]
+    if power_signals_dbm.size not in (1, n_signals):
+        raise ValueError(
+            f"power_signals_dbm has {power_signals_dbm.size} entries, but "
+            f"velocity_array has {n_signals} signal column(s); it must have "
+            f"1 entry (broadcast to all signals) or exactly {n_signals}."
+        )
+
+    E_ref0 = 10 ** (power_ref_dbm / 20)
+    E_s0   = 10 ** (power_signals_dbm / 20)
+
+    position_array = np.cumsum(velocity_array / sample_rate, axis=0)
+    phase_array = 4 * np.pi * position_array / lambda_ref
+
+    E_ref = E_ref0 * np.cos(2 * np.pi * f_ref * time)
+    E_s   = E_s0   * np.cos(2 * np.pi * f_tar * time[:, None] - phase_array)
+
+    E_total = np.column_stack((E_ref, E_s))
+
+    voltage = np.sum(E_total, axis=1)**2
     voltage += voltage.max() * np.random.normal(0, noise_sd, voltage.size)
 
     if output_csv is not None:
